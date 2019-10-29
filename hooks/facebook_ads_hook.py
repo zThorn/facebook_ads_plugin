@@ -11,7 +11,7 @@ class FacebookAdsHook(BaseHook):
         self.connection = self.get_connection(facebook_ads_conn_id)
 
         self.base_uri = 'https://graph.facebook.com'
-        self.api_version = self.connection.extra_dejson['apiVersion'] or '2.10'
+        self.api_version = self.connection.extra_dejson['apiVersion'] or '4.0'
         self.access_token = self.connection.extra_dejson['accessToken'] or self.connection.password
 
     def get_insights_for_account_id(self, 

@@ -2,23 +2,23 @@ import json
 import os
 from datetime import datetime
 
-from airflow.hooks.S3_hook import S3Hook
+from airflow.contrib.hooks.gcs_hook import GoogleCloudStorageHook
 from airflow.models import BaseOperator
 
 from facebook_ads_plugin.hooks.facebook_ads_hook import FacebookAdsHook
 
 
-class FacebookAdsInsightsToS3Operator(BaseOperator):
+class FacebookAdsInsightsToGCSOperator(BaseOperator):
     """
-    Facebook Ads Insights To S3 Operator
+    Facebook Ads Insights To GCS Operator
     :param facebook_conn_id:        The source facebook connection id.
-    :type s3_conn_id:               string
-    :param s3_conn_id:              The destination s3 connection id.
-    :type s3_conn_id:               string
-    :param s3_bucket:               The destination s3 bucket.
-    :type s3_bucket:                string
-    :param s3_key:                  The destination s3 key.
-    :type s3_key:                   string
+    :type gcs_conn_id:               string
+    :param gcs_conn_id:              The destination gcs connection id.
+    :type gcs_conn_id:               string
+    :param gcs_bucket:               The destination gcs bucket.
+    :type gcs_bucket:                string
+    :param gcs_key:                  The destination gcs key.
+    :type gcs_key:                   string
     :param account_ids:             An array of Facebook Ad Account Ids strings which
                                     own campaigns, ad_sets, and ads.
     :type account_ids:              array
@@ -44,13 +44,13 @@ class FacebookAdsInsightsToS3Operator(BaseOperator):
     :type limit:                    integer
     """
 
-    template_fields = ('s3_key', 'since', 'until')
+    template_fields = ('gcs_key', 'since', 'until')
 
     def __init__(self,
                  facebook_conn_id,
-                 s3_conn_id,
-                 s3_bucket,
-                 s3_key,
+                 gcs_conn_id,
+                 gcs_bucket,
+                 gcs_key,
                  account_ids,
                  insight_fields,
                  breakdowns,
@@ -64,9 +64,9 @@ class FacebookAdsInsightsToS3Operator(BaseOperator):
         super().__init__(*args, **kwargs)
 
         self.facebook_conn_id = facebook_conn_id
-        self.s3_conn_id = s3_conn_id
-        self.s3_bucket = s3_bucket
-        self.s3_key = s3_key
+        self.gcs_conn_id = gcs_conn_id
+        self.gcs_bucket = gcs_bucket
+        self.gcs_key = gcs_key
         self.account_ids = account_ids
         self.insight_fields = insight_fields
         self.breakdowns = breakdowns
@@ -78,14 +78,14 @@ class FacebookAdsInsightsToS3Operator(BaseOperator):
 
     def execute(self, context):
         facebook_conn = FacebookAdsHook(self.facebook_conn_id)
-        s3_conn = S3Hook(self.s3_conn_id)
+        gcs_conn = GoogleCloudStorageHook(self.gcs_conn_id)
 
         time_range = {
             'since': datetime.strptime(self.since, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d'),
             'until': datetime.strptime(self.until, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
         }
 
-        file_name = '/tmp/{key}.jsonl'.format(key=self.s3_key)
+        file_name = '/tmp/{key}.jsonl'.format(key=self.gcs_key)
         with open(file_name, 'w') as insight_file:
             for account_id in self.account_ids:
                 insights = facebook_conn.get_insights_for_account_id(account_id, 
@@ -101,5 +101,5 @@ class FacebookAdsInsightsToS3Operator(BaseOperator):
                         insight_file.write(json.dumps(insight) + '\n')
                     insight_file.write(json.dumps(insights[-1:][0]))
 
-        s3_conn.load_file(file_name, self.s3_key, self.s3_bucket, True)
+        gcs_conn.upload(filename=file_name, bucket=gcs_bucket, object=gcs_key,gzip=True)
         os.remove(file_name)
