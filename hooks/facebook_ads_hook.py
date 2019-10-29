@@ -6,6 +6,7 @@ from airflow.hooks.base_hook import BaseHook
 
 
 class FacebookAdsHook(BaseHook):
+
     def __init__(self, facebook_ads_conn_id='facebook_ads_default'):
         self.facebook_ads_conn_id = facebook_ads_conn_id
         self.connection = self.get_connection(facebook_ads_conn_id)
@@ -15,10 +16,13 @@ class FacebookAdsHook(BaseHook):
         self.access_token = self.connection.extra_dejson['accessToken'] or self.connection.password
 
     def get_insights_for_account_id(self, 
-                                    account_id, 
-                                    insight_fields, 
+                                    insight_fields,
                                     breakdowns, 
-                                    time_range, 
+                                    time_range,
+                                    account_id=None,
+                                    campaign_id=None,
+                                    adset_id=None,
+                                    ad_id=None,
                                     time_increment='all_days', 
                                     level='ad', 
                                     limit=100):
@@ -32,10 +36,17 @@ class FacebookAdsHook(BaseHook):
             'limit': limit
         })
 
+        if account_id is not None:
+            api_method = 'act_{0}'.format(account_id)
+        elif campaign_id or adset_id or ad_id is not None:
+            api_method = next((x for x in [campaign_id, adset_id, ad_id]), None)
+        else:
+            return
+
         response = requests.get('{base_uri}/v{api_version}/act_{account_id}/insights?{payload}'.format(
             base_uri=self.base_uri,
             api_version=self.api_version,
-            account_id=account_id,
+            api_method=api_method,
             payload=payload
         ))
 
