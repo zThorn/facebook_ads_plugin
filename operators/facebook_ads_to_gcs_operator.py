@@ -44,23 +44,25 @@ class FacebookAdsInsightsToGCSOperator(BaseOperator):
     :type limit:                    integer
     """
 
-    template_fields = ('gcs_key', 'since', 'until')
+    template_fields = ("gcs_key", "since", "until")
 
-    def __init__(self,
-                 facebook_conn_id,
-                 gcs_conn_id,
-                 gcs_bucket,
-                 gcs_key,
-                 account_ids,
-                 insight_fields,
-                 breakdowns,
-                 since,
-                 until,
-                 time_increment='all_days',
-                 level='ad',
-                 limit=100,
-                 *args,
-                 **kwargs):
+    def __init__(
+        self,
+        facebook_conn_id,
+        gcs_conn_id,
+        gcs_bucket,
+        gcs_key,
+        account_ids,
+        insight_fields,
+        breakdowns,
+        since,
+        until,
+        time_increment="all_days",
+        level="ad",
+        limit=1000,
+        *args,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
 
         self.facebook_conn_id = facebook_conn_id
@@ -81,25 +83,35 @@ class FacebookAdsInsightsToGCSOperator(BaseOperator):
         gcs_conn = GoogleCloudStorageHook(self.gcs_conn_id)
 
         time_range = {
-            'since': datetime.strptime(self.since, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d'),
-            'until': datetime.strptime(self.until, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
+            "since": datetime.strptime(self.since, "%Y-%m-%d %H:%M:%S").strftime(
+                "%Y-%m-%d"
+            ),
+            "until": datetime.strptime(self.until, "%Y-%m-%d %H:%M:%S").strftime(
+                "%Y-%m-%d"
+            ),
         }
 
-        file_name = '/tmp/{key}.jsonl'.format(key=self.gcs_key)
-        with open(file_name, 'w') as insight_file:
+        file_name = "/tmp/{key}.jsonl".format(key=self.gcs_key)
+        with open(file_name, "w") as insight_file:
             for account_id in self.account_ids:
-                insights = facebook_conn.get_insights_for_account_id(account_id, 
-                                                                     self.insight_fields, 
-                                                                     self.breakdowns, 
-                                                                     time_range, 
-                                                                     self.time_increment, 
-                                                                     self.level, 
-                                                                     self.limit)
+                insights = facebook_conn.get_insights_for_account_id(
+                    account_id,
+                    self.insight_fields,
+                    self.breakdowns,
+                    time_range,
+                    self.time_increment,
+                    self.level,
+                    self.limit,
+                )
 
                 if len(insights) > 0:
                     for insight in insights[:-1]:
-                        insight_file.write(json.dumps(insight) + '\n')
+                        insight_file.write(json.dumps(insight) + "\n")
                     insight_file.write(json.dumps(insights[-1:][0]))
+                else:
+                    return
 
-        gcs_conn.upload(filename=file_name, bucket=gcs_bucket, object=gcs_key,gzip=True)
+        gcs_conn.upload(
+            filename=file_name, bucket=gcs_bucket, object=gcs_key, gzip=True
+        )
         os.remove(file_name)
